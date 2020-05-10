@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.onlineafterhome.quickevnet">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>

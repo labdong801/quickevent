@@ -1,0 +1,3 @@
+rootProject.name='QuickEvent'
+include ':app'
+include ':quickevnet'
