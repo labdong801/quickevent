@@ -15,7 +15,15 @@ Feature:
 
 ### How to use
 
-### I. Send Event
+### I. Add to your project.
+
+![download](https://api.bintray.com/packages/lovejoanlyn/maven/quickevent/images/download.svg)
+
+````
+implementation 'com.onlineafterhome:quickevnet:1.0.0'
+````
+
+### II. Send Event
 
 1. Define events
 
@@ -33,24 +41,24 @@ Register and unregister your subscriber. For example on Android, activities and 
 
 ````
 @Override
- public void onStart() {
-      super.onStart();
-      EventBus.getDefault().register(this);
+public void onStart() {
+    super.onStart();
+    QuickEvent.getDefault().register(this);
 }
 
- @Override
-  public void onStop() {
-       super.onStop();
-       EventBus.getDefault().unregister(this);
+@Override
+public void onStop() {
+    super.onStop();
+    QuickEvent.getDefault().unregister(this);
 }
 ````
 
 3. Post events
 ````
-EventBus.getDefault().post(new MessageEvent());
+QuickEvent.getDefault().post(new MessageEvent());
 ````
 
-### I. Send requrst
+### III. Send requrst
 
 1. Define service
 
