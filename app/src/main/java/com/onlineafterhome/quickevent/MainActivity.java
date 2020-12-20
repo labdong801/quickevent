@@ -4,9 +4,11 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.onlineafterhome.quickevent.bean.Account;
+import com.onlineafterhome.quickevent.bean.DeviceIDMessage;
 import com.onlineafterhome.quickevent.bean.LoginResult;
 import com.onlineafterhome.quickevnet.QuickEvent;
 import com.onlineafterhome.quickevnet.QuickService;
@@ -75,5 +77,11 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         return "hello " + a;
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showID(DeviceIDMessage message){
+        TextView idText = findViewById(R.id.deviceid);
+        idText.setText(message.getAndroidId());
     }
 }

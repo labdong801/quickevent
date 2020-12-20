@@ -8,9 +8,11 @@ import com.onlineafterhome.quickevnet.ipc.message.IPCMessage;
 import com.onlineafterhome.quickevnet.util.L;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.channels.SelectionKey;
@@ -29,13 +31,12 @@ public class TcpIPCSender implements IPCSender, Runnable {
     private static final String FILE_PRE = "QuickEvent-";
     private static final String FILE_STUFX = "PORT-";
 
-    private ExecutorService mThreadPool = null;
+    private ExecutorService mThreadPool = Executors.newFixedThreadPool(1);;
     private AtomicBoolean isRunning = new AtomicBoolean(false);
 
     private String mPortFile;
 
     public TcpIPCSender() {
-        deleteCashPortFiles();
     }
 
     @Override
@@ -45,14 +46,17 @@ public class TcpIPCSender implements IPCSender, Runnable {
             ServerSocketChannel listenChannel = ServerSocketChannel.open();
             listenChannel.socket().bind(new InetSocketAddress(0));
             final int localPort = listenChannel.socket().getLocalPort();
-            File portFile = File.createTempFile(FILE_PRE, FILE_STUFX + localPort);
-            mPortFile = portFile.getAbsolutePath();
-            L.v("Listen:" + mPortFile);
+
             listenChannel.configureBlocking(false);
             //将选择器注册到各个信道
             listenChannel.register(selector, SelectionKey.OP_ACCEPT);
 
             ITCPProtocol protocol = new IPCReceiver(BUFSIZE);
+
+            // 写入文件
+            File portFile = File.createTempFile(FILE_PRE, FILE_STUFX + localPort);
+            mPortFile = portFile.getAbsolutePath();
+            L.v("Listen:" + mPortFile);
 
             while (isRunning.get()){
                 if (selector.select(TIMEOUT) == 0){
@@ -84,7 +88,12 @@ public class TcpIPCSender implements IPCSender, Runnable {
     @Override
     public void init() {
         isRunning.set(true);
-        mThreadPool = Executors.newFixedThreadPool(1);
+        mThreadPool.submit(new Runnable() {
+            @Override
+            public void run() {
+                deleteCashPortFiles();
+            }
+        });
         mThreadPool.submit(this);
     }
 
@@ -163,6 +172,7 @@ public class TcpIPCSender implements IPCSender, Runnable {
                             int port = Integer.parseInt(nameSlipt[1]);
                             // Check this port
                             if(!checkPortVaild(port)){
+                                L.v("Delete:" + f.getAbsolutePath());
                                 f.delete();
                             }
                         }catch (Throwable e){
@@ -180,9 +190,11 @@ public class TcpIPCSender implements IPCSender, Runnable {
     private List<Integer> getLocalPorts(){
         List<Integer> lists = new ArrayList<>();
         File portFile = new File(mPortFile);
-        if(mPortFile != null){
+        File parentDir = portFile.getParentFile();
+        if(mPortFile != null && parentDir != null){
             try {
-                for (File file : portFile.getParentFile().listFiles()) {
+                File[] listFiels = parentDir.listFiles();
+                for (File file : listFiels) {
                     if (file.getName().equals(portFile.getName()))
                         continue;
 
@@ -201,11 +213,16 @@ public class TcpIPCSender implements IPCSender, Runnable {
     }
 
     private boolean checkPortVaild(int port){
+        L.v("checkPortVaild: " + port);
         try {
-            DatagramSocket  socket = new DatagramSocket(port);
+            InetAddress Address = InetAddress.getByName("127.0.0.1");
+            Socket socket = new Socket(Address, port);
+//            DatagramSocket socket = new DatagramSocket(port);
+//            socket.getLocalPort();
             return true;
         } catch (Throwable e) {
-
+            L.e(e);
+        }finally{
         }
         return false;
     }
