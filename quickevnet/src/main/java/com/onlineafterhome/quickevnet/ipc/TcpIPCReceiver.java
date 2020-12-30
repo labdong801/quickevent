@@ -6,6 +6,7 @@ import com.onlineafterhome.quickevnet.ipc.message.IPCMessage;
 import com.onlineafterhome.quickevnet.util.L;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
@@ -15,13 +16,13 @@ import java.nio.charset.CharsetDecoder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class IPCReceiver implements ITCPProtocol {
+public class TcpIPCReceiver implements ITCPProtocol {
     // 缓冲区的长度
     private int bufSize;
 
     private final ExecutorService mThreadPool = Executors.newCachedThreadPool();
 
-    public IPCReceiver(int bufSize){
+    public TcpIPCReceiver(int bufSize){
         this.bufSize = bufSize;
     }
 
@@ -40,29 +41,29 @@ public class IPCReceiver implements ITCPProtocol {
         //ByteBuffer buf = (ByteBuffer) key.attachment();
         ByteBuffer buf = ByteBuffer.allocate(bufSize);
         int bytesRead = -1;
+        byte[] data = new byte[0];
         StringBuilder stringBuilder = new StringBuilder();
         while((bytesRead = clntChan.read(buf)) > 0){
             //如果缓冲区总读入了数据，则将该信道感兴趣的操作设置为为可读可写
             key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
             buf.flip();
-            Charset charset = Charset.forName("UTF-8");
-            CharsetDecoder decoder = charset.newDecoder();
-            String tmp = decoder.decode(buf.asReadOnlyBuffer()).toString();
-            stringBuilder.append(tmp);
-
+            byte[] temp = new byte[data.length + bytesRead];
+            System.arraycopy(buf.array(), 0, temp, data.length, bytesRead);
+            data = temp;
         }
 
-        final String value = stringBuilder.toString();
-        if(value.length() > 0){
+        if(data.length > 0){
             // 接收到数据
+            final String value = new String(data, 0, data.length, "UTF-8");
             L.v("IPCReceiver:" + value);
+            final byte[] finalData = data;
             mThreadPool.submit(new Runnable() {
                 @Override
                 public void run() {
-                    String resp = ipcHandle(value);
                     try {
+                        byte[] resp = ipcHandle(finalData, finalData.length);
                         if (resp != null) {
-                            clntChan.write(ByteBuffer.wrap(resp.getBytes()));
+                            clntChan.write(ByteBuffer.wrap(resp));
                             key.interestOps(SelectionKey.OP_READ);
                         }
                     } catch (IOException e) {
@@ -93,7 +94,8 @@ public class IPCReceiver implements ITCPProtocol {
 //        buf.compact();
     }
 
-    private String ipcHandle(String value){
+    protected byte[] ipcHandle(byte[] data, int size) throws UnsupportedEncodingException {
+        String value = new String(data, 0, size, "UTF-8");
         Gson gson = new Gson();
         try {
             IPCMessage msg = gson.fromJson(value, IPCMessage.class);
@@ -103,11 +105,11 @@ public class IPCReceiver implements ITCPProtocol {
 
             if(resp != null){
                 msg.setContent(gson.toJson(resp));
-                return gson.toJson(msg);
+                return gson.toJson(msg).getBytes();
             }
         }catch (Throwable e){
             L.e(e);
         }
-        return gson.toJson(new IPCMessage(null, null, null));
+        return gson.toJson(new IPCMessage(null, null, null)).getBytes();
     }
 }

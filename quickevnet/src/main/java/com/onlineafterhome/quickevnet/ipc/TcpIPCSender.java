@@ -8,10 +8,9 @@ import com.onlineafterhome.quickevnet.ipc.message.IPCMessage;
 import com.onlineafterhome.quickevnet.util.L;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.DatagramSocket;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -26,10 +25,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TcpIPCSender implements IPCSender, Runnable {
-    private static final int BUFSIZE = 256;
-    private static final int TIMEOUT = 3000;
-    private static final String FILE_PRE = "QuickEvent-";
-    private static final String FILE_STUFX = "PORT-";
+    protected static final int BUFSIZE = 256;
+    protected static final int TIMEOUT = 3000;
+    protected static final String FILE_PRE = "QuickEvent-";
+    protected static final String FILE_STUFX = "PORT-";
 
     private ExecutorService mThreadPool = Executors.newFixedThreadPool(1);;
     private AtomicBoolean isRunning = new AtomicBoolean(false);
@@ -51,7 +50,7 @@ public class TcpIPCSender implements IPCSender, Runnable {
             //将选择器注册到各个信道
             listenChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-            ITCPProtocol protocol = new IPCReceiver(BUFSIZE);
+            ITCPProtocol protocol = createProtocol();
 
             // 写入文件
             File portFile = File.createTempFile(FILE_PRE, FILE_STUFX + localPort);
@@ -85,6 +84,10 @@ public class TcpIPCSender implements IPCSender, Runnable {
         }
     }
 
+    protected TcpIPCReceiver createProtocol() {
+        return new TcpIPCReceiver(BUFSIZE);
+    }
+
     @Override
     public void init() {
         isRunning.set(true);
@@ -107,37 +110,41 @@ public class TcpIPCSender implements IPCSender, Runnable {
         List<Integer> localPorts = getLocalPorts();
         for(int port : localPorts){
             L.v("find port:" + port);
-            Gson gson = new Gson();
             try {
                 Socket soket = new Socket("127.0.0.1", port);
                 soket.setSoTimeout(30 * 1000);
-                IPCMessage msg = new IPCMessage(gson.toJson(object), object.getClass().getName(), t.getName());
                 InputStream inputStream = soket.getInputStream();
                 OutputStream outputStream = soket.getOutputStream();
-                outputStream.write(gson.toJson(msg).getBytes());
+                outputStream.write(serialize(object, t.getName()));
                 outputStream.flush();
                 byte[] buffer = new byte[1024];
-                StringBuilder stringBuilder = new StringBuilder();
+                int sum = 0;
+                //StringBuilder stringBuilder = new StringBuilder();
                 while (true){
                     if(inputStream.available() > 0){
-                        int len = soket.getInputStream().read(buffer);
-                        stringBuilder.append(new String(buffer, 0, len,"UTF-8"));
+                        int len = soket.getInputStream().read(buffer, sum, 1024);
+                        sum += len;
+                        //stringBuilder.append(new String(buffer, 0, len,"UTF-8"));
                         if(len < 1024){
                             break;
+                        }else{
+                            int newSize = buffer.length + 1024;
+                            byte[] newBuffer = new byte[newSize];
+                            System.arraycopy(buffer, 0,newBuffer, 0, sum);
+                            buffer = newBuffer;
                         }
                     }
                 }
-                L.v("remote response:" + stringBuilder.toString());
+
+                final String response = new String(buffer, 0, sum,"UTF-8");
+
+                L.v("remote response:" + response);
 
                 inputStream.close();
                 outputStream.close();
                 soket.close();
 
-
-                msg = gson.fromJson(stringBuilder.toString(), IPCMessage.class);
-                if(msg != null && msg.getContent() != null && msg.getResponseClz() != null){
-                    return (T) gson.fromJson(msg.getContent(), Class.forName(msg.getResponseClz()));
-                }
+                return deSerialize(buffer, sum);
             } catch (Throwable e) {
                 L.e(e);
             }
@@ -146,11 +153,52 @@ public class TcpIPCSender implements IPCSender, Runnable {
         return null;
     }
 
+    /**
+     * 反序列化
+     * @param response
+     * @param <T>
+     * @return
+     * @throws ClassNotFoundException
+     */
+    protected  <T> T deSerialize(byte[] response, int size) throws ClassNotFoundException, UnsupportedEncodingException {
+        IPCMessage msg;
+        Gson gson = new Gson();
+        msg = gson.fromJson(new String(response, 0, size, "UTF-8"), IPCMessage.class);
+        if(msg != null && msg.getContent() != null && msg.getResponseClz() != null){
+            return (T) gson.fromJson(msg.getContent(), Class.forName(msg.getResponseClz()));
+        }
+        return null;
+    }
+
+    /**
+     * 序列化
+     * @param object
+     * @param responseClz
+     * @param <T>
+     * @return
+     */
+    protected <T> byte[] serialize(Object object, String responseClz) {
+        Gson gson = new Gson();
+        IPCMessage msg = new IPCMessage(gson.toJson(object), object.getClass().getName(), responseClz);
+        return gson.toJson(msg).getBytes();
+    }
+
     @Override
     public void post(Object object) {
         Gson gson = new Gson();
         IPCEvent event = new IPCEvent(gson.toJson(object), object.getClass().getName());
         request(event, Integer.class);
+    }
+
+    @Override
+    public Object handleEvent(IPCEvent event) {
+        Gson gson = new Gson();
+        try {
+            return gson.fromJson(event.getContent(), Class.forName(event.getClz()));
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     /**

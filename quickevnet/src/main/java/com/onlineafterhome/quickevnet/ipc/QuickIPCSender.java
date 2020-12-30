@@ -1,5 +1,8 @@
 package com.onlineafterhome.quickevnet.ipc;
 
+import com.google.gson.Gson;
+import com.onlineafterhome.quickevnet.ipc.message.IPCEvent;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class QuickIPCSender implements IPCSender {
@@ -25,9 +28,23 @@ public class QuickIPCSender implements IPCSender {
 
     @Override
     public void init() {
-        mProxy = new TcpIPCSender();
+        mProxy = createIPCSender();
         mProxy.init();
         isInit.set(true);
+    }
+
+    /**
+     * 创建 IPC传输
+     * @return
+     */
+    private IPCSender createIPCSender() {
+        try {
+            // Protobuf 版本的 IPCSender
+            Class clz = Class.forName("com.onlineafterhome.quickevent_protobuf.TcpIPCSender");
+            return (IPCSender) clz.newInstance();
+        } catch (Exception e) {
+        }
+        return new TcpIPCSender();
     }
 
     @Override
@@ -44,5 +61,13 @@ public class QuickIPCSender implements IPCSender {
             return;
 
         mProxy.post(object);
+    }
+
+    @Override
+    public Object handleEvent(IPCEvent event){
+        if(!isInit.get())
+            return null;
+
+        return mProxy.handleEvent(event);
     }
 }

@@ -55,6 +55,25 @@ public class RemoteService extends Service {
     }
 
     @QuickService
+    public Login.LoginResult login(Login.Account account){
+//        QuickEvent.getDefault().post("welcome");
+        Login.DeviceIDMessage deviceIDMessage = Login.DeviceIDMessage.newBuilder()
+                .setAndroidId(Settings.System.getString(getContentResolver(), Settings.Secure.ANDROID_ID))
+                .build();
+        QuickEvent.getDefault().post(deviceIDMessage);
+        if(account.getUsername().equals("admin") &&
+                account.getPassword().equals("123456")){
+            return Login.LoginResult.newBuilder()
+                    .setCode(0)
+                    .setMessage("Login Success (ProtoBuf)").build();
+        }else{
+            return Login.LoginResult.newBuilder()
+                    .setCode(-1)
+                    .setMessage("Username or Password incorrect! (ProtoBuf)").build();
+        }
+    }
+
+    @QuickService
     public AddResult add(Add add){
         return new AddResult(add.getA() + add.getB());
     }

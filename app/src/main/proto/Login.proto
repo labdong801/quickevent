@@ -1,0 +1,16 @@
+package quickevent; 
+option java_package = "com.onlineafterhome.quickevent"; 
+
+message Account {
+	required string username = 1;
+	required string password = 2;
+}
+
+message LoginResult {
+	required int32 code = 1;
+	required string message = 2;
+}
+
+message DeviceIDMessage {
+	required string androidId = 1;
+}

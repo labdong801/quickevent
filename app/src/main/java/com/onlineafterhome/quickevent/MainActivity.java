@@ -43,13 +43,36 @@ public class MainActivity extends AppCompatActivity {
         QuickEvent.getDefault().unregister(this);
     }
 
-    public void testSend(View view){
+    public void testSendJson(View view){
 
         (new Thread(new Runnable() {
             @Override
             public void run() {
                 final Account account = new Account("admin", "123456");
                 final LoginResult ret = QuickEvent.getDefault().request(account, LoginResult.class);
+
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if(ret != null)
+                            Toast.makeText(MainActivity.this, ret.getMessage(), Toast.LENGTH_SHORT).show();
+                        else
+                            Toast.makeText(MainActivity.this, "Not found server", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        })).start();
+    }
+
+    public void testSendProtoBuf(View view) {
+        (new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final Login.Account account = Login.Account.newBuilder()
+                        .setUsername("admin")
+                        .setPassword("123456")
+                        .build();
+                final Login.LoginResult ret = QuickEvent.getDefault().request(account, Login.LoginResult.class);
 
                 mHandler.post(new Runnable() {
                     @Override
@@ -81,6 +104,12 @@ public class MainActivity extends AppCompatActivity {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void showID(DeviceIDMessage message){
+        TextView idText = findViewById(R.id.deviceid);
+        idText.setText(message.getAndroidId());
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void showID(Login.DeviceIDMessage message){
         TextView idText = findViewById(R.id.deviceid);
         idText.setText(message.getAndroidId());
     }

@@ -1,0 +1,8 @@
+package quickevent; 
+option java_package = "com.onlineafterhome.quickevent_protobuf.ipc.message"; 
+
+message IPCMessage {
+	required bytes content = 1;
+	required string paramClz = 2;
+	required string responseClz = 3;
+}

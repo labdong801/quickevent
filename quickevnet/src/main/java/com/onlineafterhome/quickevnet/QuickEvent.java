@@ -172,8 +172,9 @@ public class QuickEvent implements Runnable {
     @QuickService
     public Integer bridgeEventFromOtherProcess(IPCEvent event){
         try {
-            Gson gson = new Gson();
-            mEventQueue.add(gson.fromJson(event.getContent(), Class.forName(event.getClz())));
+            Object o = QuickIPCSender.getInstance().handleEvent(event);
+            if(o != null)
+                mEventQueue.add(o);
         }catch (Throwable e){
             L.e(e);
         }
